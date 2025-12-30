@@ -1,5 +1,6 @@
 import http from "http";
 import Signer from "./signer.js";
+import NetworkMonitor from "./network-monitor.js";
 import { config } from "./config.js";
 import { ValidationError } from "./validators.js";
 import logger from "./logger.js";
@@ -7,6 +8,7 @@ import logger from "./logger.js";
 class SignatureServer {
   constructor() {
     this.signer = null;
+    this.monitor = null;
     this.server = null;
     this.requestCount = 0;
     this.startTime = Date.now();
@@ -18,6 +20,15 @@ class SignatureServer {
 
       this.signer = new Signer();
       await this.signer.init();
+
+      // Initialize network monitor
+      this.monitor = new NetworkMonitor(
+        this.signer.browser,
+        config.monitoring.defaultUrl
+      );
+      await this.monitor.init();
+      await this.monitor.start();
+      logger.info('Network monitoring started');
 
       this.server = http.createServer(this.handleRequest.bind(this));
 
@@ -209,6 +220,11 @@ class SignatureServer {
         });
       }
 
+      if (this.monitor) {
+        await this.monitor.stop();
+        logger.info('Network monitor stopped');
+      }
+
       if (this.signer) {
         await this.signer.close();
         logger.info('Signer closed');
@@ -250,6 +266,10 @@ class SignatureServer {
       await new Promise((resolve) => {
         this.server.close(resolve);
       });
+    }
+
+    if (this.monitor) {
+      await this.monitor.stop();
     }
 
     if (this.signer) {

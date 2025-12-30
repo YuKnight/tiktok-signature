@@ -1,4 +1,7 @@
 import Signer from "./index.js";
+import NetworkMonitor from "./src/network-monitor.js";
+import { config } from "./src/config.js";
+import logger from "./src/logger.js";
 import http from "http";
 
 const PORT = process.env.PORT || 8080;
@@ -22,6 +25,15 @@ let requestCount = 0;
     console.log("Initializing signer...");
     await signer.init();
     console.log("Signer initialized successfully");
+
+    // Initialize network monitor
+    const monitor = new NetworkMonitor(
+      signer.browser,
+      config.monitoring.defaultUrl
+    );
+    await monitor.init();
+    await monitor.start();
+    logger.info('Network monitoring started');
 
     server.on("request", (request, response) => {
       response.setHeader("Access-Control-Allow-Origin", "*");
@@ -70,6 +82,23 @@ let requestCount = 0;
         };
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(metricsData));
+        return;
+      }
+
+      // Last captured item_list URL endpoint
+      if (request.method === "GET" && request.url === "/last-item-list") {
+        const itemListData = monitor.getLastItemListData();
+        const responseData = {
+          status: "ok",
+          data: {
+            url: itemListData.url,
+            userAgent: itemListData.userAgent,
+            captured: itemListData.url !== null
+          },
+          timestamp: new Date().toISOString()
+        };
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(responseData));
         return;
       }
 
@@ -132,6 +161,7 @@ let requestCount = 0;
     // Handle graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('Received SIGTERM, closing server...');
+      await monitor.stop();
       await signer.close();
       server.close(() => {
         console.log('Server closed');
@@ -141,6 +171,7 @@ let requestCount = 0;
 
     process.on('SIGINT', async () => {
       console.log('Received SIGINT, closing server...');
+      await monitor.stop();
       await signer.close();
       server.close(() => {
         console.log('Server closed');

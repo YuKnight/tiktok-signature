@@ -6,7 +6,7 @@ import Utils from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const iPhone11 = devices["iPhone 11 Pro"];
+const iPhone15 = devices["Desktop Safari"];
 class Signer {
   userAgent =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36";
@@ -18,7 +18,7 @@ class Signer {
     "--start-maximized",
   ];
   // Default TikTok loading page
-  default_url = "https://www.tiktok.com/@rihanna?lang=en";
+  default_url = "https://www.tiktok.com/@andreibanuta";
 
   // Password for xttparams AES encryption
   password = "webapp1.0+202106";
@@ -65,7 +65,7 @@ class Signer {
     this.browser = await chromium.launch(this.options);
 
     let emulateTemplate = {
-      ...iPhone11,
+      ...iPhone15,
       locale: "en-US",
       deviceScaleFactor: Utils.getRandomInt(1, 3),
       isMobile: Math.random() > 0.5,
@@ -82,14 +82,14 @@ class Signer {
 
     this.page = await this.context.newPage();
 
-    await this.page.route("**/*", (route) => {
-      return route.request().resourceType() === "script"
-        ? route.abort()
-        : route.continue();
-    });
+    // await this.page.route("**/*", (route) => {
+    //   return route.request().resourceType() === "script"
+    //     ? route.abort()
+    //     : route.continue();
+    // });
 
     await this.page.goto(this.default_url, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
 
     let LOAD_SCRIPTS = ["signer.js", "webmssdk.js", "xbogus.js"];
@@ -98,7 +98,6 @@ class Signer {
       await this.page.addScriptTag({
         path: `${__dirname}/javascript/${script}`,
       });
-      // console.log("[+] " + script + " loaded");
     }
 
     await this.page.evaluate(() => {

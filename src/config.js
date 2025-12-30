@@ -32,4 +32,11 @@ export const config = {
     windowMs: 15 * 60 * 1000,
     max: 100,
   },
+  monitoring: {
+    enabled: process.env.MONITORING_ENABLED !== 'false',
+    defaultUrl: process.env.MONITORING_URL || process.env.DEFAULT_URL || 'https://www.tiktok.com/@rihanna?lang=en',
+    interval: parseInt(process.env.MONITORING_INTERVAL) || 60 * 60 * 1000, // 1 hour
+    logDir: process.env.LOG_DIR || 'logs',
+    logFile: 'api_monitoring.log',
+  },
 };
