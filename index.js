@@ -1,9 +1,14 @@
 import "dotenv/config";
 import { createCipheriv, createHash } from "crypto";
-import { devices, chromium } from "playwright-chromium";
+import { devices } from "playwright-chromium";
+import { chromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import Utils from "./utils.js";
+
+// Add stealth plugin to chromium
+chromium.use(StealthPlugin());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,11 +21,24 @@ class Signer {
   userAgent =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36";
   args = [
-    "--disable-blink-features",
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
     "--window-size=1920,1080",
     "--start-maximized",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-accelerated-2d-canvas",
+    "--no-first-run",
+    "--no-zygote",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "--mute-audio",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-web-security",
+    "--disable-features=IsolateOrigins,site-per-process",
   ];
   // Default TikTok loading page
   default_url = "https://www.tiktok.com/@andreibanuta";
@@ -109,6 +127,37 @@ class Signer {
     });
 
     this.page = await this.context.newPage();
+
+    // Additional stealth: Override navigator properties to hide automation
+    await this.page.addInitScript(() => {
+      // Override navigator.webdriver
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => false,
+      });
+
+      // Override Chrome runtime
+      window.navigator.chrome = {
+        runtime: {},
+      };
+
+      // Override permissions
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Notification.permission }) :
+          originalQuery(parameters)
+      );
+
+      // Override plugins to avoid detection
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5],
+      });
+
+      // Override languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en'],
+      });
+    });
 
     // await this.page.route("**/*", (route) => {
     //   return route.request().resourceType() === "script"
