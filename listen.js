@@ -93,6 +93,7 @@ let requestCount = 0;
           data: {
             url: itemListData.url,
             userAgent: itemListData.userAgent,
+            capturedAt: itemListData.capturedAt,
             captured: itemListData.url !== null
           },
           timestamp: new Date().toISOString()

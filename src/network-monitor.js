@@ -14,6 +14,7 @@ class NetworkMonitor {
     this.page = null;
     this.intervalId = null;
     this.lastItemListUrl = null; // Store the last captured item_list URL
+    this.lastItemListCapturedAt = null; // Store when it was captured
     this.userAgent = config.browser.userAgent; // Store user agent
   }
 
@@ -59,8 +60,9 @@ class NetworkMonitor {
 
   logApiRequest(request) {
     const url = request.url();
+    const timestamp = new Date().toISOString();
     const logEntry = {
-      timestamp: new Date().toISOString(),
+      timestamp: timestamp,
       method: request.method(),
       url: url
     };
@@ -68,6 +70,7 @@ class NetworkMonitor {
     // Store last item_list URL if it matches the pattern
     if (url.includes('/api/post/item_list/')) {
       this.lastItemListUrl = url;
+      this.lastItemListCapturedAt = timestamp;
       logger.info(`[API Capture - Item List] ${logEntry.method} ${url}`);
     } else {
       logger.info(`[API Capture] ${logEntry.method} ${url}`);
@@ -130,7 +133,8 @@ class NetworkMonitor {
   getLastItemListData() {
     return {
       url: this.lastItemListUrl,
-      userAgent: this.userAgent
+      userAgent: this.userAgent,
+      capturedAt: this.lastItemListCapturedAt
     };
   }
 
