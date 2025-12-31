@@ -47,12 +47,18 @@ class Signer {
     this.args.push(`--user-agent="${this.userAgent}"`);
 
     this.options = {
-      // executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", // MacOS default path
       headless: true,
       args: this.args,
       ignoreDefaultArgs: ["--mute-audio", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
     };
+
+    // Add executablePath if configured via EXECUTABLE_PATH env variable
+    // Example: EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    if (process.env.EXECUTABLE_PATH) {
+      this.options.executablePath = process.env.EXECUTABLE_PATH;
+      console.log(`Using Chrome executable: ${process.env.EXECUTABLE_PATH}`);
+    }
 
     // Add proxy if configured via PROXY_URL env variable
     if (PROXY_URL) {

@@ -46,7 +46,7 @@ class NetworkMonitor {
     // The monitoring page should behave like a real browser to trigger API calls
 
     this.setupRequestListener();
-    logger.info('Network monitor initialized');
+    logger.info(`Network monitor initialized - Browser connected: ${this.browser?.isConnected()}, Page closed: ${this.page?.isClosed()}`);
   }
 
   setupRequestListener() {
@@ -106,9 +106,31 @@ class NetworkMonitor {
     }
   }
 
+  async ensurePageReady() {
+    // Check if browser is still connected
+    if (!this.browser || !this.browser.isConnected()) {
+      logger.error('Browser is disconnected, cannot reinitialize without browser');
+      throw new Error('Browser is disconnected');
+    }
+
+    // Check if context or page is closed
+    if (!this.context || !this.page || this.page.isClosed()) {
+      logger.info('Context or page is closed, reinitializing...');
+      await this.init();
+    }
+  }
+
   async reloadAndCapture(skipRefresh = false) {
     try {
       logger.info('Reloading page for monitoring...');
+
+      // Debug: log current state
+      logger.info(`Browser connected: ${this.browser?.isConnected()}, Context: ${!!this.context}, Page: ${!!this.page}, Page closed: ${this.page?.isClosed()}`);
+
+      // Ensure page is ready before attempting reload
+      await this.ensurePageReady();
+
+      logger.info('Page ready, proceeding with navigation...');
 
       // Set up promise to wait for item_list capture
       this.waitingForCapture = true;
@@ -204,6 +226,18 @@ class NetworkMonitor {
       // Clean up promise state
       this.waitingForCapture = false;
       this.captureResolve = null;
+
+      // If page/context was closed, try to reinitialize and retry once
+      if (error.message && error.message.includes('closed')) {
+        logger.info('Attempting to reinitialize after closed page error...');
+        try {
+          await this.init();
+          logger.info('Reinitialized successfully, retrying capture...');
+          await this.reloadAndCapture(true); // skipRefresh to avoid infinite loop
+        } catch (retryError) {
+          logger.error('Retry after reinitialize also failed', retryError);
+        }
+      }
     }
   }
 
