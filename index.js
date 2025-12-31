@@ -1,14 +1,10 @@
 import "dotenv/config";
 import { createCipheriv, createHash } from "crypto";
-import { devices } from "playwright-chromium";
-import { chromium } from "playwright-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import { devices, chromium } from "playwright-chromium";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import Utils from "./utils.js";
-
-// Add stealth plugin to chromium
-chromium.use(StealthPlugin());
+import { stealthScript } from "./src/stealth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,21 +20,18 @@ class Signer {
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
     "--window-size=1920,1080",
-    "--start-maximized",
     "--no-sandbox",
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
-    "--disable-accelerated-2d-canvas",
     "--no-first-run",
-    "--no-zygote",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--mute-audio",
     "--disable-background-timer-throttling",
     "--disable-backgrounding-occluded-windows",
     "--disable-renderer-backgrounding",
-    "--disable-web-security",
-    "--disable-features=IsolateOrigins,site-per-process",
+    // Enable WebRTC and network features for TikTok detection bypass
+    "--enable-webrtc",
+    "--enable-usermedia-screen-capturing",
+    "--disable-features=WebRtcHideLocalIpsWithMdns",
+    "--force-webrtc-ip-handling-policy=default",
   ];
   // Default TikTok loading page
   default_url = "https://www.tiktok.com/@andreibanuta";
@@ -64,15 +57,17 @@ class Signer {
 
     this.args.push(`--user-agent="${this.userAgent}"`);
 
+    // Note: headless: false requires EXECUTABLE_PATH on macOS (bundled Chromium crashes)
+    const isHeadless = process.env.BROWSER_HEADLESS !== 'false';
+
     this.options = {
-      headless: true,
+      headless: isHeadless,
       args: this.args,
       ignoreDefaultArgs: ["--mute-audio", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
     };
 
     // Add executablePath if configured via EXECUTABLE_PATH env variable
-    // Example: EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     if (process.env.EXECUTABLE_PATH) {
       this.options.executablePath = process.env.EXECUTABLE_PATH;
       console.log(`Using Chrome executable: ${process.env.EXECUTABLE_PATH}`);
@@ -128,36 +123,7 @@ class Signer {
 
     this.page = await this.context.newPage();
 
-    // Additional stealth: Override navigator properties to hide automation
-    await this.page.addInitScript(() => {
-      // Override navigator.webdriver
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-      });
-
-      // Override Chrome runtime
-      window.navigator.chrome = {
-        runtime: {},
-      };
-
-      // Override permissions
-      const originalQuery = window.navigator.permissions.query;
-      window.navigator.permissions.query = (parameters) => (
-        parameters.name === 'notifications' ?
-          Promise.resolve({ state: Notification.permission }) :
-          originalQuery(parameters)
-      );
-
-      // Override plugins to avoid detection
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5],
-      });
-
-      // Override languages
-      Object.defineProperty(navigator, 'languages', {
-        get: () => ['en-US', 'en'],
-      });
-    });
+    await this.page.addInitScript(stealthScript);
 
     // await this.page.route("**/*", (route) => {
     //   return route.request().resourceType() === "script"
