@@ -6,6 +6,7 @@ import logger from "./src/logger.js";
 import http from "http";
 
 const PORT = process.env.PORT || 8080;
+const HOST = process.env.HOST || "0.0.0.0";
 
 // Server metrics
 const startTime = Date.now();
@@ -17,9 +18,9 @@ let requestCount = 0;
 
     const server = http
       .createServer()
-      .listen(PORT)
+      .listen(PORT, HOST)
       .on("listening", function () {
-        console.log("TikTok Signature server started on PORT " + PORT);
+        console.log(`TikTok Signature server started on ${HOST}:${PORT}`);
       });
 
     // Initialize signer

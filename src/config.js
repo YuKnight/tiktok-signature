@@ -12,6 +12,7 @@ const getDefaultUserAgent = () => USER_AGENTS[platform()] || USER_AGENTS.linux;
 
 export const config = {
   server: {
+    host: process.env.HOST || '0.0.0.0',
     port: process.env.PORT || 8080,
     timeout: process.env.TIMEOUT || 60 * 60 * 1000,
     cors: {
