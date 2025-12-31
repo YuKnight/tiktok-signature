@@ -1,12 +1,18 @@
 // This script should be injected via page.addInitScript() before navigating to any page
 
 export const stealthScript = `
-// Configuration options
+// Auto-detect platform and set appropriate values for consistency
+const isLinux = navigator.platform.toLowerCase().includes('linux');
+const isMac = navigator.platform.toLowerCase().includes('mac');
+const isWindows = navigator.platform.toLowerCase().includes('win');
+
+// Configuration options - use platform-appropriate values
 const opts = {
-  webgl_vendor: "Intel Inc.",
-  webgl_renderer: "Intel Iris OpenGL Engine",
+  // WebGL values that match the platform to avoid fingerprint mismatch
+  webgl_vendor: isLinux ? "Google Inc. (Intel)" : (isMac ? "Intel Inc." : "Google Inc. (NVIDIA)"),
+  webgl_renderer: isLinux ? "ANGLE (Intel, Mesa Intel(R) UHD Graphics, OpenGL 4.6)" : (isMac ? "Intel Iris OpenGL Engine" : "ANGLE (NVIDIA, NVIDIA GeForce, OpenGL 4.5)"),
   navigator_vendor: "Google Inc.",
-  navigator_platform: null,
+  navigator_platform: null, // Keep original platform
   navigator_user_agent: null,
   languages: ["en-US", "en"],
   runOnInsecureOrigins: null,

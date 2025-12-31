@@ -1,4 +1,14 @@
 import "dotenv/config";
+import { platform } from "os";
+
+// Platform-specific user agents for consistency (avoid fingerprint mismatch)
+const USER_AGENTS = {
+  darwin: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  win32: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+};
+
+const getDefaultUserAgent = () => USER_AGENTS[platform()] || USER_AGENTS.linux;
 
 export const config = {
   server: {
@@ -12,8 +22,7 @@ export const config = {
   browser: {
     headless: process.env.BROWSER_HEADLESS !== 'false',
     defaultUrl: process.env.DEFAULT_URL || 'https://www.tiktok.com/@rihanna?lang=en',
-    userAgent: process.env.USER_AGENT ||
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36',
+    userAgent: process.env.USER_AGENT || getDefaultUserAgent(),
     proxyUrl: process.env.PROXY_URL || null,
     executablePath: process.env.EXECUTABLE_PATH || null, // e.g., "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" for macOS
     args: [

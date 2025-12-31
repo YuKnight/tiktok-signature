@@ -1,8 +1,9 @@
 import "dotenv/config";
-import { createCipheriv, createHash } from "crypto";
+import { createCipheriv } from "crypto";
 import { devices, chromium } from "playwright-chromium";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { platform } from "os";
 import Utils from "./utils.js";
 import { stealthScript } from "./src/stealth.js";
 
@@ -13,9 +14,16 @@ const iPhone15 = devices["Desktop Safari"];
 // Proxy URL from environment variable
 const PROXY_URL = process.env.PROXY_URL || null;
 
+// Platform-specific user agents for consistency (avoid fingerprint mismatch)
+const USER_AGENTS = {
+  darwin: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  win32: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+};
+
 class Signer {
-  userAgent =
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36";
+  // Use platform-appropriate user agent to avoid fingerprint mismatch
+  userAgent = USER_AGENTS[platform()] || USER_AGENTS.linux;
   args = [
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
@@ -57,7 +65,8 @@ class Signer {
 
     this.args.push(`--user-agent="${this.userAgent}"`);
 
-    // Note: headless: false requires EXECUTABLE_PATH on macOS (bundled Chromium crashes)
+    // Note: headless: false with bundled Chromium crashes on macOS
+    // Use EXECUTABLE_PATH for non-headless mode, or use headless: true
     const isHeadless = process.env.BROWSER_HEADLESS !== 'false';
 
     this.options = {
