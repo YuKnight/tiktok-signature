@@ -49,8 +49,9 @@ class Signer {
 
   // Additional properties
   deviceId = Utils.generateDeviceId();
+  msToken = null;
 
-  constructor(default_url, userAgent, browser) {
+  constructor(default_url, userAgent, browser, msToken) {
     if (default_url) {
       this.default_url = default_url;
     }
@@ -62,6 +63,9 @@ class Signer {
       this.browser = browser;
       this.isExternalBrowser = true;
     }
+
+    // Set msToken from parameter or environment variable
+    this.msToken = msToken || process.env.MS_TOKEN || null;
 
     this.args.push(`--user-agent="${this.userAgent}"`);
 
@@ -129,6 +133,20 @@ class Signer {
       bypassCSP: true,
       ...emulateTemplate,
     });
+
+    // Set msToken cookie if provided
+    if (this.msToken) {
+      await this.context.addCookies([{
+        name: 'msToken',
+        value: this.msToken,
+        domain: '.tiktok.com',
+        path: '/',
+        httpOnly: false,
+        secure: true,
+        sameSite: 'None'
+      }]);
+      console.log('msToken cookie set');
+    }
 
     this.page = await this.context.newPage();
 
@@ -221,6 +239,22 @@ class Signer {
     );
   }
 
+
+  async setMsToken(msToken) {
+    this.msToken = msToken;
+    if (this.context && msToken) {
+      await this.context.addCookies([{
+        name: 'msToken',
+        value: msToken,
+        domain: '.tiktok.com',
+        path: '/',
+        httpOnly: false,
+        secure: true,
+        sameSite: 'None'
+      }]);
+      console.log('msToken cookie updated');
+    }
+  }
 
   async close() {
     if (this.browser && !this.isExternalBrowser) {

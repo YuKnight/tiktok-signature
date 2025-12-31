@@ -62,5 +62,6 @@ export const config = {
     interval: parseInt(process.env.MONITORING_INTERVAL) || 60 * 60 * 1000, // 1 hour
     logDir: process.env.LOG_DIR || 'logs',
     logFile: 'api_monitoring.log',
+    msToken: process.env.MS_TOKEN || null, // msToken cookie for authenticated requests
   },
 };

@@ -3,11 +3,12 @@ import { join } from 'path';
 import { devices } from 'playwright-chromium';
 import { config } from './config.js';
 import logger from './logger.js';
+import { stealthScript } from './stealth.js';
 
 const iPhone11 = devices["iPhone 11 Pro"];
 
 class NetworkMonitor {
-  constructor(browser, defaultUrl) {
+  constructor(browser, defaultUrl, msToken) {
     this.browser = browser;
     this.defaultUrl = defaultUrl || config.monitoring.defaultUrl;
     this.context = null;
@@ -18,6 +19,7 @@ class NetworkMonitor {
     this.userAgent = config.browser.userAgent; // Store user agent
     this.waitingForCapture = false; // Flag for waiting state
     this.captureResolve = null; // Resolver for capture promise
+    this.msToken = msToken || process.env.MS_TOKEN || null; // msToken cookie
   }
 
   async init() {
@@ -40,10 +42,24 @@ class NetworkMonitor {
       ...emulateTemplate,
     });
 
+    // Set msToken cookie if provided
+    if (this.msToken) {
+      await this.context.addCookies([{
+        name: 'msToken',
+        value: this.msToken,
+        domain: '.tiktok.com',
+        path: '/',
+        httpOnly: false,
+        secure: true,
+        sameSite: 'None'
+      }]);
+      logger.info('msToken cookie set for monitoring');
+    }
+
     this.page = await this.context.newPage();
 
-    // Don't block scripts - we need the page to load normally to capture API requests
-    // The monitoring page should behave like a real browser to trigger API calls
+    // Apply stealth scripts to avoid detection
+    await this.page.addInitScript(stealthScript);
 
     this.setupRequestListener();
     logger.info(`Network monitor initialized - Browser connected: ${this.browser?.isConnected()}, Page closed: ${this.page?.isClosed()}`);
@@ -303,6 +319,22 @@ class NetworkMonitor {
     } catch (error) {
       logger.error('Failed to read from log file', error);
       return null;
+    }
+  }
+
+  async setMsToken(msToken) {
+    this.msToken = msToken;
+    if (this.context && msToken) {
+      await this.context.addCookies([{
+        name: 'msToken',
+        value: msToken,
+        domain: '.tiktok.com',
+        path: '/',
+        httpOnly: false,
+        secure: true,
+        sameSite: 'None'
+      }]);
+      logger.info('msToken cookie updated for monitoring');
     }
   }
 

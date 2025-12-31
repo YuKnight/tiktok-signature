@@ -31,7 +31,8 @@ let requestCount = 0;
     // Initialize network monitor
     const monitor = new NetworkMonitor(
       signer.browser,
-      config.monitoring.defaultUrl
+      config.monitoring.defaultUrl,
+      config.monitoring.msToken
     );
     await monitor.init();
     await monitor.start();
