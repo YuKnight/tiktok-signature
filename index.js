@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createCipheriv, createHash } from "crypto";
 import { devices, chromium } from "playwright-chromium";
 import { fileURLToPath } from "url";
@@ -7,6 +8,10 @@ import Utils from "./utils.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const iPhone15 = devices["Desktop Safari"];
+
+// Proxy URL from environment variable
+const PROXY_URL = process.env.PROXY_URL || null;
+
 class Signer {
   userAgent =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36";
@@ -48,6 +53,24 @@ class Signer {
       ignoreDefaultArgs: ["--mute-audio", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
     };
+
+    // Add proxy if configured via PROXY_URL env variable
+    if (PROXY_URL) {
+      try {
+        const proxyUrl = new URL(PROXY_URL);
+        this.options.proxy = {
+          server: `${proxyUrl.protocol}//${proxyUrl.host}`
+        };
+        // Add credentials if present
+        if (proxyUrl.username && proxyUrl.password) {
+          this.options.proxy.username = decodeURIComponent(proxyUrl.username);
+          this.options.proxy.password = decodeURIComponent(proxyUrl.password);
+        }
+        console.log(`Using proxy: ${proxyUrl.protocol}//${proxyUrl.host}`);
+      } catch (e) {
+        console.error("Invalid PROXY_URL format:", e.message);
+      }
+    }
   }
 
   async init() {

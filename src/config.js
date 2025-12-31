@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 export const config = {
   server: {
     port: process.env.PORT || 8080,
@@ -12,6 +14,7 @@ export const config = {
     defaultUrl: process.env.DEFAULT_URL || 'https://www.tiktok.com/@rihanna?lang=en',
     userAgent: process.env.USER_AGENT ||
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36',
+    proxyUrl: process.env.PROXY_URL || null,
     args: [
       '--disable-blink-features',
       '--disable-blink-features=AutomationControlled',

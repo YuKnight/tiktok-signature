@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Signer from "./index.js";
 import NetworkMonitor from "./src/network-monitor.js";
 import { config } from "./src/config.js";

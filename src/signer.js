@@ -37,6 +37,24 @@ class Signer {
       ignoreHTTPSErrors: true,
     };
 
+    // Add proxy if configured via PROXY_URL env variable
+    if (config.browser.proxyUrl) {
+      try {
+        const proxyUrl = new URL(config.browser.proxyUrl);
+        this.options.proxy = {
+          server: `${proxyUrl.protocol}//${proxyUrl.host}`
+        };
+        // Add credentials if present
+        if (proxyUrl.username && proxyUrl.password) {
+          this.options.proxy.username = decodeURIComponent(proxyUrl.username);
+          this.options.proxy.password = decodeURIComponent(proxyUrl.password);
+        }
+        logger.info(`Using proxy: ${proxyUrl.protocol}//${proxyUrl.host}`);
+      } catch (e) {
+        logger.error("Invalid PROXY_URL format:", e.message);
+      }
+    }
+
     logger.info('Signer instance created', {
       defaultUrl: this.default_url,
       headless: config.browser.headless,

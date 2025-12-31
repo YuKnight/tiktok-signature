@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'fs';
+import { appendFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { devices } from 'playwright-chromium';
 import { config } from './config.js';
@@ -16,6 +16,8 @@ class NetworkMonitor {
     this.lastItemListUrl = null; // Store the last captured item_list URL
     this.lastItemListCapturedAt = null; // Store when it was captured
     this.userAgent = config.browser.userAgent; // Store user agent
+    this.waitingForCapture = false; // Flag for waiting state
+    this.captureResolve = null; // Resolver for capture promise
   }
 
   async init() {
@@ -72,6 +74,14 @@ class NetworkMonitor {
       this.lastItemListUrl = url;
       this.lastItemListCapturedAt = timestamp;
       logger.info(`[API Capture - Item List] ${logEntry.method} ${url}`);
+
+      // Resolve waiting promise if we're waiting for capture
+      if (this.waitingForCapture && this.captureResolve) {
+        logger.info('Item list captured, resolving wait promise');
+        this.captureResolve();
+        this.waitingForCapture = false;
+        this.captureResolve = null;
+      }
     } else {
       logger.info(`[API Capture] ${logEntry.method} ${url}`);
     }
@@ -96,16 +106,104 @@ class NetworkMonitor {
     }
   }
 
-  async reloadAndCapture() {
+  async reloadAndCapture(skipRefresh = false) {
     try {
       logger.info('Reloading page for monitoring...');
+
+      // Set up promise to wait for item_list capture
+      this.waitingForCapture = true;
+      const capturePromise = new Promise((resolve) => {
+        this.captureResolve = resolve;
+
+        // Timeout after 15 seconds
+        setTimeout(() => {
+          if (this.waitingForCapture) {
+            logger.info('Capture wait timeout after 15 seconds');
+            this.waitingForCapture = false;
+            this.captureResolve = null;
+            resolve();
+          }
+        }, 15000);
+      });
+
+      // Load the page
       await this.page.goto(this.defaultUrl, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: 30000
       });
-      logger.info('Page reloaded for monitoring');
+
+      logger.info('Page loaded, waiting for item_list API call...');
+
+      // Wait for either capture or 5 second minimum
+      await Promise.all([
+        new Promise(resolve => setTimeout(resolve, 5000)), // Wait at least 5 seconds
+        capturePromise // Also wait for capture (or timeout)
+      ]);
+
+      // If still not captured after waiting, try scrolling to trigger lazy-loaded content
+      if (!this.lastItemListUrl) {
+        logger.info('Item list not captured yet, trying scroll to trigger API call...');
+        try {
+          await this.page.evaluate(() => {
+            window.scrollTo(0, 500);
+          });
+          // Wait another 3 seconds after scroll
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        } catch (scrollError) {
+          logger.error('Error scrolling page', scrollError);
+        }
+      }
+
+      // Always refresh once to ensure we get a fresh URL
+      if (!skipRefresh) {
+        logger.info('Refreshing page to get fresh item_list URL...');
+
+        // Clear the waiting state before refresh
+        this.waitingForCapture = false;
+        this.captureResolve = null;
+
+        // Refresh the page
+        await this.page.reload({
+          waitUntil: 'domcontentloaded',
+          timeout: 30000
+        });
+
+        logger.info('Page refreshed, waiting for item_list API call...');
+
+        // Set up new capture promise after refresh
+        this.waitingForCapture = true;
+        const refreshCapturePromise = new Promise((resolve) => {
+          this.captureResolve = resolve;
+
+          setTimeout(() => {
+            if (this.waitingForCapture) {
+              logger.info('Post-refresh capture timeout');
+              this.waitingForCapture = false;
+              this.captureResolve = null;
+              resolve();
+            }
+          }, 15000);
+        });
+
+        // Wait again after refresh
+        await Promise.all([
+          new Promise(resolve => setTimeout(resolve, 5000)),
+          refreshCapturePromise
+        ]);
+      }
+
+      if (this.lastItemListUrl) {
+        logger.info('Successfully captured item_list URL');
+      } else {
+        logger.warn('No item_list URL captured even after refresh');
+      }
+
+      logger.info('Page reload and capture complete');
     } catch (error) {
       logger.error('Failed to reload monitoring page', error);
+      // Clean up promise state
+      this.waitingForCapture = false;
+      this.captureResolve = null;
     }
   }
 
@@ -131,11 +229,47 @@ class NetworkMonitor {
   }
 
   getLastItemListData() {
+    // Always load from log file
+    const logData = this.loadLastItemListFromLog();
     return {
-      url: this.lastItemListUrl,
+      url: logData?.url || null,
       userAgent: this.userAgent,
-      capturedAt: this.lastItemListCapturedAt
+      capturedAt: logData?.timestamp || null
     };
+  }
+
+  loadLastItemListFromLog() {
+    try {
+      const logPath = join(config.monitoring.logDir, config.monitoring.logFile);
+
+      if (!existsSync(logPath)) {
+        logger.info('Log file does not exist yet');
+        return null;
+      }
+
+      const content = readFileSync(logPath, 'utf8');
+      const lines = content.trim().split('\n').filter(line => line);
+
+      // Search from the end to find the last item_list URL
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const entry = JSON.parse(lines[i]);
+          if (entry.url && entry.url.includes('/api/post/item_list/')) {
+            logger.info(`Loaded last item_list URL from log file: ${entry.url}`);
+            return entry;
+          }
+        } catch (parseError) {
+          // Skip malformed lines
+          continue;
+        }
+      }
+
+      logger.info('No item_list URL found in log file');
+      return null;
+    } catch (error) {
+      logger.error('Failed to read from log file', error);
+      return null;
+    }
   }
 
   async stop() {
